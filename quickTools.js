@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// One Hand Operation+ for GNOME (port of one-hand-op/shell.qml): drag
-// inward from a screen edge to open a panel of quick tools, or keep dragging
-// to the middle of the screen for the launcher.
+// One Hand Operation+ style quick tools: drag inward from a screen edge to
+// open a panel of quick tools, or keep dragging to the middle of the screen
+// for the launcher.
 //
 // Sections: the quick tools themselves (built-in and custom, listed in
 // toolCatalog.js), the quick tools panel, and the edge swipes.
@@ -18,7 +18,6 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as SystemActions from 'resource:///org/gnome/shell/misc/systemActions.js';
-import {MprisSource} from 'resource:///org/gnome/shell/ui/mpris.js';
 import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {showScreenshotUI, showScreenRecordingUI} from 'resource:///org/gnome/shell/ui/screenshot.js';
@@ -31,9 +30,6 @@ import {CUSTOM_PREFIX, getBuiltinTool, parseCustomTools} from './toolCatalog.js'
 // Settings-backed toggles talk to GSettings directly; hardware toggles
 // (Wi-Fi, Bluetooth, ...) reuse the toggles from GNOME's Quick Settings so
 // they behave exactly like the system menu.
-
-
-
 
 class Tool {
     constructor(meta) {
@@ -533,22 +529,107 @@ export class KeepAwake {
 // Samsung's One Hand Operation+ panel. Uses the shell's own MPRIS,
 // brightness and volume APIs instead of playerctl, busctl and wpctl.
 
-
-
-
 const PANEL_WIDTH = 300;
 const MARGIN = 12;
 const SLIDE_IN_TIME = 220;
 const SLIDE_OUT_TIME = 250;
 const VOLUME_STEP = 0.05;
 
-// MprisSource has no destroy(), so share one for the whole session instead of
-// leaking a D-Bus watcher on every enable.
-let mprisSource = null;
+const MPRIS_PREFIX = 'org.mpris.MediaPlayer2.';
+const MprisPlayerProxy = Gio.DBusProxy.makeProxyWrapper(`<node>
+  <interface name="org.mpris.MediaPlayer2.Player">
+    <method name="PlayPause"/>
+    <method name="Next"/>
+    <method name="Previous"/>
+    <property name="PlaybackStatus" type="s" access="read"/>
+    <property name="Metadata" type="a{sv}" access="read"/>
+    <property name="CanPlay" type="b" access="read"/>
+    <property name="CanGoNext" type="b" access="read"/>
+    <property name="CanGoPrevious" type="b" access="read"/>
+  </interface>
+</node>`);
 
-function getMprisSource() {
-    mprisSource ??= new MprisSource();
-    return mprisSource;
+/** Media players (MPRIS) on the session bus, for the panel's media controls. */
+class MediaPlayers {
+    /** @param {Function} onChanged - a player appeared, went away or changed */
+    constructor(onChanged) {
+        this._onChanged = onChanged;
+        this._players = new Map();
+        this._cancellable = new Gio.Cancellable();
+
+        this._nameWatchId = Gio.DBus.session.signal_subscribe('org.freedesktop.DBus',
+            'org.freedesktop.DBus', 'NameOwnerChanged', '/org/freedesktop/DBus', null,
+            Gio.DBusSignalFlags.NONE, (conn, sender, path, iface, signal, params) => {
+                const [name, oldOwner, newOwner] = params.deepUnpack();
+                if (!name.startsWith(MPRIS_PREFIX))
+                    return;
+                if (oldOwner)
+                    this._remove(name);
+                if (newOwner)
+                    this._add(name);
+            });
+
+        Gio.DBus.session.call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'ListNames', null, new GLib.VariantType('(as)'),
+            Gio.DBusCallFlags.NONE, -1, this._cancellable, (conn, res) => {
+                try {
+                    const [names] = conn.call_finish(res).deepUnpack();
+                    for (const name of names.filter(n => n.startsWith(MPRIS_PREFIX)))
+                        this._add(name);
+                } catch (e) {
+                    if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                        logError(e, 'loco-shell: cannot list media players');
+                }
+            });
+    }
+
+    _add(name) {
+        if (this._players.has(name))
+            return;
+
+        const entry = {proxy: null};
+        this._players.set(name, entry);
+        MprisPlayerProxy(Gio.DBus.session, name, '/org/mpris/MediaPlayer2', (proxy, error) => {
+            // Gone (or this object destroyed) while the proxy was being set up.
+            if (error || this._players.get(name) !== entry)
+                return;
+            entry.proxy = proxy;
+            proxy.connectObject('g-properties-changed', () => this._onChanged(), this);
+            this._onChanged();
+        }, this._cancellable);
+    }
+
+    _remove(name) {
+        const entry = this._players.get(name);
+        if (!entry)
+            return;
+        entry.proxy?.disconnectObject(this);
+        this._players.delete(name);
+        this._onChanged();
+    }
+
+    /** @returns {Gio.DBusProxy|null} the player that is playing, else the first that can */
+    get active() {
+        const players = [...this._players.values()].map(e => e.proxy).filter(p => p?.CanPlay);
+        return players.find(p => p.PlaybackStatus === 'Playing') ?? players[0] ?? null;
+    }
+
+    destroy() {
+        this._cancellable.cancel();
+        Gio.DBus.session.signal_unsubscribe(this._nameWatchId);
+        for (const entry of this._players.values())
+            entry.proxy?.disconnectObject(this);
+        this._players.clear();
+    }
+}
+
+function trackTitle(player) {
+    const title = player.Metadata?.['xesam:title']?.deepUnpack();
+    return typeof title === 'string' && title ? title : 'Unknown Title';
+}
+
+function callPlayer(player, method) {
+    player?.[`${method}Async`]().catch(e => logError(e, `loco-shell: ${method} failed`));
 }
 
 function flatIconButton(iconName, accessibleName) {
@@ -595,8 +676,6 @@ export class QuickPanel {
         this._settings = settings;
         this._ctx = ctx;
         this._grab = null;
-        this._player = null;
-        this._players = new Set();
         this._brightnessScale = null;
         this._stream = null;
         this._syncingSlider = false;
@@ -608,14 +687,7 @@ export class QuickPanel {
             'changed::quick-tools', () => this._toolsChanged(),
             'changed::custom-tools', () => this._toolsChanged(), this);
 
-        this._mpris = getMprisSource();
-        this._mpris.connectObject(
-            'player-added', () => this._syncMedia(),
-            'player-removed', (source, player) => {
-                player.disconnectObject(this);
-                this._players.delete(player);
-                this._syncMedia();
-            }, this);
+        this._media = new MediaPlayers(() => this._syncMedia());
         this._syncMedia();
 
         Main.brightnessManager.connectObject('changed', () => this._bindBrightness(), this);
@@ -725,15 +797,15 @@ export class QuickPanel {
         const controls = new St.BoxLayout({style_class: 'loco-media-controls', x_expand: true});
 
         this._prevButton = flatIconButton('media-skip-backward-symbolic', 'Previous track');
-        this._prevButton.connect('clicked', () => this._player?.previous());
+        this._prevButton.connect('clicked', () => callPlayer(this._media.active, 'Previous'));
         controls.add_child(this._prevButton);
 
         this._playButton = flatIconButton('media-playback-start-symbolic', 'Play or pause');
-        this._playButton.connect('clicked', () => this._player?.playPause());
+        this._playButton.connect('clicked', () => callPlayer(this._media.active, 'PlayPause'));
         controls.add_child(this._playButton);
 
         this._nextButton = flatIconButton('media-skip-forward-symbolic', 'Next track');
-        this._nextButton.connect('clicked', () => this._player?.next());
+        this._nextButton.connect('clicked', () => callPlayer(this._media.active, 'Next'));
         controls.add_child(this._nextButton);
 
         const volumeDown = flatIconButton('audio-volume-low-symbolic', 'Volume down');
@@ -877,23 +949,13 @@ export class QuickPanel {
     }
 
     _syncMedia() {
-        const players = this._mpris.players;
-        for (const player of players) {
-            if (!this._players.has(player)) {
-                this._players.add(player);
-                player.connectObject('changed', () => this._syncMedia(), this);
-            }
-        }
-
-        this._player = players.find(p => p.status === 'Playing') ?? players[0] ?? null;
-        const player = this._player;
-
-        this._mediaTitle.text = player ? player.trackTitle || 'Unknown Title' : 'No media playing';
-        this._playButton.child.icon_name = player?.status === 'Playing'
+        const player = this._media.active;
+        this._mediaTitle.text = player ? trackTitle(player) : 'No media playing';
+        this._playButton.child.icon_name = player?.PlaybackStatus === 'Playing'
             ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
         this._playButton.reactive = !!player;
-        this._prevButton.reactive = !!player?.canGoPrevious;
-        this._nextButton.reactive = !!player?.canGoNext;
+        this._prevButton.reactive = !!player?.CanGoPrevious;
+        this._nextButton.reactive = !!player?.CanGoNext;
     }
 
     _bindBrightness() {
@@ -945,7 +1007,7 @@ export class QuickPanel {
         this._volumeSlider.value = Math.min(1, level);
         this._syncingSlider = false;
 
-        // Same as the QML: the slider is dimmed and locked while muted.
+        // The slider is dimmed and locked while muted.
         this._volumeSlider.reactive = !muted;
         this._volumeSlider.opacity = muted ? 128 : 255;
         this._volumeLabel.text = muted ? 'Muted' : `${Math.round(level * 100)}%`;
@@ -1045,10 +1107,7 @@ export class QuickPanel {
             tool.destroy();
         this._tools = [];
         this._settings.disconnectObject(this);
-        this._mpris.disconnectObject(this);
-        for (const player of this._players)
-            player.disconnectObject(this);
-        this._players.clear();
+        this._media.destroy();
         Main.brightnessManager.disconnectObject(this);
         this._brightnessScale?.disconnectObject(this);
         this._mixer.disconnectObject(this);
@@ -1065,11 +1124,9 @@ export class QuickPanel {
     }
 }
 
-// Port of the left/right edge hotzones from one-hand-op/shell.qml: drag
-// inward from a thin strip at the screen edge to open the quick panel, or
-// keep dragging to the middle of the screen to open the launcher.
-
-
+// The left/right edge hotzones: drag inward from a thin strip at the screen
+// edge to open the quick panel, or keep dragging to the middle of the screen
+// to open the launcher.
 
 const STRIP_WIDTH = 8;
 const TRIGGER_DISTANCE = 45;
@@ -1195,8 +1252,7 @@ export class EdgeSwipe {
         this._handlers = handlers;
         this._strips = [];
 
-        // Pill that follows the finger, like the QML gesture indicator. Its
-        // icon says what releasing now will do.
+        // Pill that follows the finger. Its icon says what releasing now will do.
         this._indicatorIcon = new St.Icon({style_class: 'loco-edge-indicator-icon'});
         this._indicator = new St.Bin({
             style_class: 'popup-menu-content loco-edge-indicator',

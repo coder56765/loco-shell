@@ -71,6 +71,19 @@ gnome-extensions enable loco-shell@ali
 ./install.sh --update-kitchen
 ```
 
+## Packing for extensions.gnome.org
+
+```sh
+cd ..
+gnome-extensions pack loco-shell \
+  --extra-source=launcher.js --extra-source=emoji.js --extra-source=quickTools.js \
+  --extra-source=toolCatalog.js --extra-source=kitchen.txt.gz --extra-source=LICENSE \
+  --schema=schemas/org.gnome.shell.extensions.loco-shell.gschema.xml \
+  --out-dir=loco-shell/dist --force
+```
+
+This writes `dist/loco-shell@ali.shell-extension.zip`. It leaves out `install.sh` and the compiled schema, which extensions.gnome.org doesn't accept. Pass the folder name, not `.`: `gnome-extensions pack .` crashes in GNOME 50.
+
 ## Files
 
 | File | What it holds |

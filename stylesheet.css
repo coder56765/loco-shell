@@ -86,7 +86,7 @@
   spacing: 10px;
 }
 
-/* 24px + 2px border = the 28px ring from the QML */
+/* 24px plus a 2px border: a 28px ring */
 .loco-color-ring {
   width: 24px;
   height: 24px;

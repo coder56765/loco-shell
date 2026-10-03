@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// The Loco launcher: a Poco-style app launcher (port of
-// loco-launcher/shell.qml) with an app grid, a bar of color dots that filter
-// apps by icon color, an emoji button that switches to the emoji picker
-// (emoji.js), and a search bar at the bottom, within thumb reach.
+// The Loco launcher: a Poco-style app launcher with an app grid, a bar of
+// color dots that filter apps by icon color, an emoji button that switches
+// to the emoji picker (emoji.js), and a search bar at the bottom, within
+// thumb reach.
 //
 // Also home to the small widgets shared with quickTools.js.
 
@@ -98,9 +98,9 @@ class TileGridLayout extends Clutter.LayoutManager {
 
 // ---- Icon colors -----------------------------------------------------------
 
-// Native port of loco-launcher/index_apps.py: classifies every installed
-// app by the dominant color of its icon, without ImageMagick.
-
+// Classifies every installed app by the dominant color of its icon: each
+// opaque pixel of a small rendering votes for a color, and the most common
+// one wins.
 
 const CATEGORIES = ['All', 'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'White', 'Black'];
 
@@ -125,7 +125,7 @@ const CHANGED_DELAY_MS = 250;
 const SAVE_DELAY_MS = 2000;
 
 /**
- * Same HSV thresholds as classify_color() in index_apps.py.
+ * Buckets a color by HSV: near-white and near-black first, then by hue.
  *
  * @param {number} r - red, 0-255
  * @param {number} g - green, 0-255
@@ -446,14 +446,6 @@ const GRID_RISE = 0.45;
 const ROW_STAGGER = 22;
 const MAX_STAGGER_ROWS = 8;
 
-function tileGrid(styleClass = 'loco-grid') {
-    return new St.Widget({
-        style_class: styleClass,
-        x_expand: true,
-        layout_manager: new TileGridLayout(),
-    });
-}
-
 function tileLabel(text) {
     const label = new St.Label({
         style_class: 'loco-tile-label',
@@ -624,7 +616,11 @@ export class LocoLauncher {
             clip_to_allocation: true,
         });
 
-        this._grid = tileGrid();
+        this._grid = new St.Widget({
+            style_class: 'loco-grid',
+            x_expand: true,
+            layout_manager: new TileGridLayout(),
+        });
         // Emoji mode lives in emoji.js; its sections share this scrollable column.
         this._emoji = new EmojiPicker({
             settings: this._settings,

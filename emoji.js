@@ -72,26 +72,6 @@ async function loadGzipText(file) {
     return new TextDecoder().decode(output.steal_as_bytes().toArray());
 }
 
-function delay(ms) {
-    return new Promise(resolve => {
-        GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
-            resolve();
-            return GLib.SOURCE_REMOVE;
-        });
-    });
-}
-
-/** @returns {Promise<boolean>} whether predicate() came true within timeoutMs */
-async function waitFor(predicate, timeoutMs) {
-    for (let waited = 0; waited <= timeoutMs; waited += 50) {
-        if (predicate())
-            return true;
-        // eslint-disable-next-line no-await-in-loop
-        await delay(50);
-    }
-    return false;
-}
-
 function isSkinToneVariant(char) {
     for (const c of char) {
         const cp = c.codePointAt(0);
@@ -345,6 +325,34 @@ function isCancelled(error) {
  * way GNOME's on-screen keyboard does.
  */
 class TextDelivery {
+    constructor() {
+        this._timeouts = new Set();
+        this._destroyed = false;
+    }
+
+    // A wait that destroy() cancels; after that, the caller never resumes.
+    _delay(ms) {
+        return new Promise(resolve => {
+            const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+                this._timeouts.delete(id);
+                resolve();
+                return GLib.SOURCE_REMOVE;
+            });
+            this._timeouts.add(id);
+        });
+    }
+
+    /** @returns {Promise<boolean>} whether predicate() came true within timeoutMs */
+    async _waitFor(predicate, timeoutMs) {
+        for (let waited = 0; waited <= timeoutMs; waited += 50) {
+            if (predicate())
+                return true;
+            // eslint-disable-next-line no-await-in-loop
+            await this._delay(50);
+        }
+        return false;
+    }
+
     _keyboard() {
         this._device ??= Clutter.get_default_backend().get_default_seat()
             .create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
@@ -372,7 +380,7 @@ class TextDelivery {
         }
 
         // Prefer the input method, once the app's text field has it back.
-        if (await waitFor(() => Main.inputMethod.currentFocus !== null, INPUT_FOCUS_WAIT_MS)) {
+        if (await this._waitFor(() => Main.inputMethod.currentFocus !== null, INPUT_FOCUS_WAIT_MS)) {
             Main.inputMethod.commit(text);
             return;
         }
@@ -382,10 +390,12 @@ class TextDelivery {
         const clipboard = St.Clipboard.get_default();
         const previous = await new Promise(resolve =>
             clipboard.get_text(St.ClipboardType.CLIPBOARD, (c, old) => resolve(old)));
+        if (this._destroyed)
+            return;
         clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
         this._tap([Clutter.KEY_Control_L, Clutter.KEY_v]);
         if (previous !== null) {
-            await delay(CLIPBOARD_RESTORE_MS);
+            await this._delay(CLIPBOARD_RESTORE_MS);
             clipboard.set_text(St.ClipboardType.CLIPBOARD, previous);
         }
     }
@@ -396,21 +406,31 @@ class TextDelivery {
      */
     async pasteImage(file, hasTarget) {
         const bytes = await loadFileContents(file);
+        if (this._destroyed)
+            return;
         St.Clipboard.get_default().set_content(St.ClipboardType.CLIPBOARD, 'image/png', new GLib.Bytes(bytes));
         if (!hasTarget) {
             Main.notify('Sticker copied', 'Paste it with Ctrl+V.');
             return;
         }
         // Give the app its keyboard focus back before pasting.
-        await delay(150);
+        await this._delay(150);
         this._tap([Clutter.KEY_Control_L, Clutter.KEY_v]);
+    }
+
+    destroy() {
+        this._destroyed = true;
+        for (const id of this._timeouts)
+            GLib.source_remove(id);
+        this._timeouts.clear();
+        this._device = null;
     }
 }
 
 // Shows a long list of equally sized tiles inside a scroll view, creating
 // only the tiles on screen (plus a row above and below) and re-binding them
-// as the view scrolls. Creating and laying out thousands of St widgets on
-// the shell's main thread is what made emoji mode slow.
+// as the view scrolls. Creating thousands of St widgets at once would stall
+// the shell, which draws on the same thread.
 const VirtualTileGrid = GObject.registerClass(
 class VirtualTileGrid extends St.Widget {
     /**
@@ -879,8 +899,10 @@ export class EmojiPicker {
             if (tile.token === token)
                 this._showStickerImage(tile, file);
         }).catch(e => {
-            if (!isCancelled(e))
+            if (!isCancelled(e) && !this._warnedDownload) {
+                this._warnedDownload = true;
                 console.warn(`loco-shell: sticker download failed: ${e.message}`);
+            }
         });
     }
 
@@ -1042,6 +1064,7 @@ export class EmojiPicker {
             GLib.source_remove(this._prefetchId);
         this._prefetchId = 0;
         this._stickers.destroy();
+        this._delivery.destroy();
         this._settings.disconnectObject(this);
         // The grids and the pin button are destroyed with the launcher's widgets.
     }
