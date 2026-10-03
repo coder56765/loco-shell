@@ -23,6 +23,9 @@ import {ensureActorVisibleInScrollView} from 'resource:///org/gnome/shell/misc/a
 
 const MAX_FAVORITE_EMOJIS = 7;
 const MAX_RECENT_EMOJIS = 14;
+// Recents are stored with room for the favorites, which the recent row skips,
+// so that row stays full and an unpinned favorite returns to its old place.
+const STORED_RECENT_EMOJIS = MAX_RECENT_EMOJIS + MAX_FAVORITE_EMOJIS;
 const KITCHEN_IMAGE_URL = 'https://www.gstatic.com/android/keyboard/emojikitchen';
 const MAX_STICKER_DOWNLOADS = 6;
 // The emoji list is loaded this long after startup, so emoji mode opens at once.
@@ -763,12 +766,9 @@ export class EmojiPicker {
     _syncSections() {
         const active = this._active;
         const searching = this._query !== '';
-        const favorites = this._settings.get_strv('favorite-emojis');
-        const recents = this._settings.get_strv('recent-emojis');
-
         // Favorites only once something is pinned; both rows step aside while searching.
-        this._favGrid.visible = active && !searching && favorites.length > 0;
-        this._recentGrid.visible = active && !searching && recents.length > 0;
+        this._favGrid.visible = active && !searching && this._favGrid.items.length > 0;
+        this._recentGrid.visible = active && !searching && this._recentGrid.items.length > 0;
         this._separator.visible = this._favGrid.visible || this._recentGrid.visible;
         this._emojiGrid.visible = active && !this._selected;
         this._kitchenGrid.visible = active && !!this._selected;
@@ -806,8 +806,13 @@ export class EmojiPicker {
     _syncPinnedRows() {
         if (!this._items)
             return;
-        this._favGrid.setItems(this._settings.get_strv('favorite-emojis').map(c => this._item(c)));
-        this._recentGrid.setItems(this._settings.get_strv('recent-emojis').map(c => this._item(c)));
+        const favorites = this._settings.get_strv('favorite-emojis');
+        const favoriteKeys = new Set(favorites.map(emojiKey));
+        const recents = this._settings.get_strv('recent-emojis')
+            .filter(c => !favoriteKeys.has(emojiKey(c)))
+            .slice(0, MAX_RECENT_EMOJIS);
+        this._favGrid.setItems(favorites.map(c => this._item(c)));
+        this._recentGrid.setItems(recents.map(c => this._item(c)));
         this._syncSections();
         this._syncPinButton();
     }
@@ -1034,7 +1039,7 @@ export class EmojiPicker {
         const text = emojiText(char);
         const key = emojiKey(char);
         const recents = this._settings.get_strv('recent-emojis').filter(c => emojiKey(c) !== key);
-        this._settings.set_strv('recent-emojis', [text, ...recents].slice(0, MAX_RECENT_EMOJIS));
+        this._settings.set_strv('recent-emojis', [text, ...recents].slice(0, STORED_RECENT_EMOJIS));
 
         const hasTarget = this._hasInsertTarget();
         this._launcher.closeForInsert();
