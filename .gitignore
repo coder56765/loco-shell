@@ -1,0 +1,6 @@
+# Built by GNOME on install (and by install.sh for local use)
+schemas/gschemas.compiled
+
+# Upload zips
+*.shell-extension.zip
+dist/

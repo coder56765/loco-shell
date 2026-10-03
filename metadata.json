@@ -1,0 +1,8 @@
+{
+  "uuid": "loco-shell@ali",
+  "name": "Loco Shell",
+  "description": "A Poco-style app launcher that replaces Show Apps: filter apps by icon color, search from the bottom, and pick emoji with Emoji Kitchen stickers. Plus One Hand Operation+-style edge swipes that open a panel of configurable quick tools (swipe on to the middle of the screen for the launcher).\n\nClipboard: inserting an emoji into apps without an input method, and pasting a sticker, go through the clipboard (your previous clipboard text is restored after an emoji). Network: Emoji Kitchen sticker images are downloaded from Google's servers (www.gstatic.com) when you open an emoji's stickers, and cached locally.",
+  "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.loco-shell",
+  "url": "https://github.com/coder56765/loco-shell"
+}

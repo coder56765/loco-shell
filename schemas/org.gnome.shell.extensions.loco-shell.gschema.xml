@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.loco-shell" path="/org/gnome/shell/extensions/loco-shell/">
+    <key name="quick-tools" type="as">
+      <default>['wifi', 'bluetooth', 'night-light', 'dark-style', 'dnd', 'screenshot', 'lock', 'keep-awake', 'break-reminders', 'screen-record', 'loco-settings', 'close-panel']</default>
+      <summary>Quick tools</summary>
+      <description>Tool ids shown in the quick tools grid, in order. Custom tools use ids starting with "custom-".</description>
+    </key>
+    <key name="custom-tools" type="s">
+      <default>'[]'</default>
+      <summary>Custom tools</summary>
+      <description>JSON array of {id, name, icon, type: "app" | "command", target}.</description>
+    </key>
+    <key name="left-edge" type="b">
+      <default>true</default>
+      <summary>Swipe from the left screen edge</summary>
+    </key>
+    <key name="right-edge" type="b">
+      <default>true</default>
+      <summary>Swipe from the right screen edge</summary>
+    </key>
+    <key name="long-swipe-launcher" type="b">
+      <default>true</default>
+      <summary>Open the launcher when a swipe reaches the middle of the screen</summary>
+    </key>
+    <key name="keep-awake" type="b">
+      <default>false</default>
+      <summary>Keep the screen awake</summary>
+      <description>While on, the session is kept from going idle or suspending.</description>
+    </key>
+    <key name="favorite-emojis" type="as">
+      <default>[]</default>
+      <summary>Pinned emoji</summary>
+      <description>The launcher's favorites row, in pin order. At most 7; pinning more drops the oldest.</description>
+    </key>
+    <key name="recent-emojis" type="as">
+      <default>[]</default>
+      <summary>Recently used emoji</summary>
+      <description>Most recent first, at most 14 (two rows of the launcher).</description>
+    </key>
+    <key name="saved-break-reminders" type="as">
+      <default>['eyesight', 'movement']</default>
+      <summary>Break types restored when break reminders are switched back on</summary>
+    </key>
+  </schema>
+</schemalist>

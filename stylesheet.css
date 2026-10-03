@@ -1,0 +1,357 @@
+/*
+ * Containers reuse the shell's .popup-menu-content and plain StEntry styling,
+ * so they follow the light/dark style. Everything below only adds neutral grey
+ * overlays and the accent color, which read well on both.
+ */
+
+/* ---------- Loco launcher ---------- */
+
+.popup-menu-content.loco-launcher {
+  padding: 24px;
+  spacing: 16px;
+  border-radius: 28px;
+}
+
+/* Color dots and search, below the grid */
+.loco-launcher-bottom {
+  spacing: 12px;
+}
+
+.loco-search {
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 11pt;
+}
+
+.loco-search .search-entry-icon {
+  icon-size: 1.091em;
+  padding: 0 4px;
+}
+
+.loco-launcher .loco-scroll.vfade {
+  -st-vfade-offset: 24px;
+}
+
+/* Each tile is 120x136 including margin, for 64px icons. */
+.loco-tile {
+  width: 100px;
+  max-width: 100px;
+  height: 116px;
+  max-height: 116px;
+  padding: 6px;
+  margin: 4px;
+  border-radius: 16px;
+  transition-duration: 100ms;
+}
+
+.loco-tile:hover {
+  background-color: rgba(127, 127, 127, 0.15);
+}
+
+.loco-tile:active {
+  background-color: rgba(127, 127, 127, 0.25);
+}
+
+.loco-tile:focus {
+  background-color: st-transparentize(-st-accent-color, 0.8);
+  box-shadow: inset 0 0 0 1px -st-accent-color;
+}
+
+.loco-tile-box {
+  spacing: 8px;
+}
+
+.loco-tile-label {
+  font-size: 10pt;
+  text-align: center;
+}
+
+/* Bottom color bar (Poco style) */
+.loco-color-bar {
+  height: 55px;
+  padding: 0 15px;
+  spacing: 12px;
+  border-radius: 12px;
+  background-color: rgba(127, 127, 127, 0.1);
+  border: 1px solid rgba(127, 127, 127, 0.15);
+}
+
+.loco-color-label {
+  min-width: 4.5em;
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.loco-color-dots {
+  spacing: 10px;
+}
+
+/* 24px + 2px border = the 28px ring from the QML */
+.loco-color-ring {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 99px;
+  border: 2px solid transparent;
+}
+
+.loco-color-ring:focus {
+  background-color: rgba(127, 127, 127, 0.25);
+}
+
+.loco-color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+}
+
+.loco-color-ring:hover .loco-color-dot {
+  width: 24px;
+  height: 24px;
+}
+
+.loco-color-ring.selected .loco-color-dot {
+  width: 18px;
+  height: 18px;
+}
+
+.loco-color-ring.selected:hover .loco-color-dot {
+  width: 20px;
+  height: 20px;
+}
+
+/* "All": red-to-blue stripe with an accent border; sizes are 4px smaller
+   to make room for that border. */
+.loco-color-dot-all {
+  width: 18px;
+  height: 18px;
+  border: 2px solid -st-accent-color;
+  background-gradient-direction: horizontal;
+  background-gradient-start: #E53935;
+  background-gradient-end: #1E88E5;
+}
+
+.loco-color-ring:hover .loco-color-dot-all {
+  width: 20px;
+  height: 20px;
+}
+
+.loco-color-ring.selected .loco-color-dot-all {
+  width: 14px;
+  height: 14px;
+}
+
+.loco-color-ring.selected:hover .loco-color-dot-all {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- Launcher: emoji mode ---------- */
+
+.loco-content {
+  spacing: 6px;
+}
+
+/* The big emoji in a tile, where apps have their icon */
+.loco-emoji-glyph {
+  font-size: 38px;
+  text-align: center;
+}
+
+/* The emoji whose Kitchen stickers are showing */
+.loco-tile.selected {
+  background-color: st-transparentize(-st-accent-color, 0.75);
+  box-shadow: inset 0 0 0 2px -st-accent-color;
+}
+
+/* Between the favorite/recent rows and the rest */
+.loco-emoji-separator {
+  height: 1px;
+  margin: 4px 24px;
+  background-color: rgba(127, 127, 127, 0.25);
+}
+
+.loco-emoji-status {
+  padding: 32px 0;
+  font-size: 11pt;
+  font-weight: bold;
+}
+
+/* The emoji button after Black: the same kind of ring as the color dots,
+   but bigger, so the emoji reads at a glance. */
+.loco-color-ring.loco-emoji-ring {
+  width: 30px;
+  height: 30px;
+}
+
+.loco-emoji-dot {
+  font-size: 22px;
+}
+
+.loco-emoji-ring.selected {
+  border-color: -st-accent-color;
+}
+
+/* Far right of the color bar: pin the selected emoji */
+.loco-pin-button {
+  padding: 8px;
+  border-radius: 99px;
+  color: -st-accent-color;
+}
+
+.loco-pin-button StIcon {
+  icon-size: 18px;
+}
+
+.loco-pin-button:hover {
+  background-color: rgba(127, 127, 127, 0.2);
+}
+
+.loco-pin-button:insensitive {
+  color: rgba(127, 127, 127, 0.5);
+}
+
+/* ---------- One-hand edge swipe ---------- */
+
+.popup-menu-content.loco-edge-indicator {
+  padding: 0;
+  border-radius: 20px;
+  transition-duration: 80ms;
+}
+
+.popup-menu-content.loco-edge-indicator.active {
+  background-color: -st-accent-color;
+  border-color: -st-accent-color;
+  color: -st-accent-fg-color;
+}
+
+.loco-edge-indicator-icon {
+  icon-size: 22px;
+}
+
+/* ---------- Quick tools panel (Samsung One Hand Operation+ layout) ---------- */
+
+.popup-menu-content.loco-quick-panel {
+  padding: 10px;
+  spacing: 10px;
+  border-radius: 24px;
+}
+
+/* Rounded blocks: brightness, volume + media, tools */
+.loco-quick-section {
+  padding: 10px;
+  spacing: 8px;
+  border-radius: 16px;
+  background-color: rgba(127, 127, 127, 0.12);
+}
+
+.loco-quick-row {
+  spacing: 8px;
+}
+
+.loco-row-icon {
+  icon-size: 16px;
+  color: -st-accent-color;
+}
+
+.loco-media-title {
+  font-size: 9pt;
+  font-weight: bold;
+}
+
+.loco-media-controls {
+  spacing: 4px;
+}
+
+.loco-media-controls .loco-flat-button {
+  color: -st-accent-color;
+}
+
+.loco-value-label {
+  min-width: 3.2em;
+  color: -st-accent-color;
+  font-size: 9pt;
+  font-weight: bold;
+  text-align: right;
+}
+
+.loco-flat-button {
+  padding: 6px;
+  border-radius: 99px;
+}
+
+.loco-flat-button StIcon {
+  icon-size: 16px;
+}
+
+.loco-flat-button:hover {
+  background-color: rgba(127, 127, 127, 0.2);
+}
+
+.loco-flat-button:active {
+  background-color: rgba(127, 127, 127, 0.3);
+}
+
+.loco-flat-button:focus {
+  box-shadow: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.4);
+}
+
+.loco-flat-button:insensitive {
+  color: rgba(127, 127, 127, 0.6);
+}
+
+.loco-value-label.loco-muted,
+.loco-flat-button.loco-muted {
+  color: #e62d42;
+}
+
+/* Tool tiles: 44px circles in a 60px cell, four per row. Accent icon when
+   off, filled with the accent color while a toggle is on. */
+.loco-tool {
+  width: 44px;
+  max-width: 44px;
+  height: 44px;
+  max-height: 44px;
+  margin: 8px;
+  padding: 0;
+  border-radius: 99px;
+  color: -st-accent-color;
+  background-color: rgba(127, 127, 127, 0.15);
+  transition-duration: 100ms;
+}
+
+.loco-tool-icon {
+  icon-size: 20px;
+}
+
+.loco-tool:hover {
+  background-color: rgba(127, 127, 127, 0.28);
+}
+
+.loco-tool:active {
+  background-color: rgba(127, 127, 127, 0.38);
+}
+
+.loco-tool:focus {
+  box-shadow: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.3);
+}
+
+.loco-tool:checked {
+  color: -st-accent-fg-color;
+  background-color: -st-accent-color;
+}
+
+.loco-tool:checked:hover {
+  background-color: st-lighten(-st-accent-color, 8%);
+}
+
+.loco-tool:insensitive {
+  color: rgba(127, 127, 127, 0.55);
+  background-color: rgba(127, 127, 127, 0.07);
+}
+
+.loco-quick-hint {
+  min-height: 1.4em;
+  font-size: 9pt;
+  font-weight: bold;
+}
