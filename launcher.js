@@ -476,6 +476,8 @@ export class LocoLauncher {
         this._mode = 'apps';
         this._tiles = [];
         this._tilesDirty = true;
+        // Tiles that the reveal animation has moved out of place.
+        this._staggered = new Set();
         this._grab = null;
         this._gesture = false;
 
@@ -498,10 +500,12 @@ export class LocoLauncher {
         // Full-monitor layer: clicking anywhere outside the card closes it.
         this._backdrop = new St.Widget({reactive: true, visible: false});
         // The shell also destroys these widgets at logout without calling
-        // destroy() on us; stop reacting to app and color changes then.
+        // destroy() on us; stop reacting to app and color changes then, and
+        // stop a closing animation that would otherwise outlive them.
         this._backdrop.connect('destroy', () => {
             this._appSystem.disconnectObject(this);
             this._colorIndex.disconnectObject(this);
+            this._reveal.remove_transition('value');
         });
         // A right click anywhere drops the emoji selection.
         this._backdrop.connect('captured-event', (actor, event) => {
@@ -755,6 +759,8 @@ export class LocoLauncher {
 
     _rebuildTiles() {
         this._tilesDirty = false;
+        for (const {button} of this._tiles)
+            this._staggered.delete(button);
         this._grid.destroy_all_children();
 
         const apps = this._appSystem.get_installed()
@@ -928,13 +934,23 @@ export class LocoLauncher {
         const rowHeight = tiles[0]?.height || 1;
         const scrollTop = this._scrollView.vadjustment.value;
         const limit = scrollTop + (MAX_STAGGER_ROWS + 1) * rowHeight;
+        const staggered = new Set();
         for (const button of tiles) {
             const y = button.get_parent().y + button.y;
             if (y > limit && lag > 0)
                 continue;
             const row = Math.min(MAX_STAGGER_ROWS, Math.max(0, Math.floor((y - scrollTop) / rowHeight)));
             button.translation_y = lag * row * ROW_STAGGER;
+            if (button.translation_y !== 0)
+                staggered.add(button);
         }
+        // Tiles out of view now (the other mode, a filtered-out app, emoji
+        // tiles reused for another row) must not keep their old offset.
+        for (const button of this._staggered) {
+            if (!staggered.has(button))
+                button.translation_y = 0;
+        }
+        this._staggered = staggered;
     }
 
     // Puts the launcher on screen, fully hidden (reveal 0), without a grab.
